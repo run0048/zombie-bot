@@ -1,18 +1,23 @@
 from discord.ext import commands
 import discord
 import userStatus
+import timeSchedule
+import vcStatus
 
 from dotenv import load_dotenv
 load_dotenv()
 import os
 
+
 TOKEN = os.getenv("TOKEN")
-GUILD_ID = os.getenv("GUILD_ID")
+
 
 intents = discord.Intents.default()
 intents.members = True # メンバー管理の権限
 intents.message_content = True # メッセージの内容を取得する権限
 intents.guilds = True #サーバー管理の権限
+intents.voice_states = True #VC関連の権限
+intents.moderation = True #time out の権限
 
 # Botをインスタンス化
 bot = commands.Bot(
@@ -22,7 +27,8 @@ bot = commands.Bot(
 )
 
 client = discord.Client(intents=intents)
-guild = client.get_guild(GUILD_ID)
+
+
 
 @bot.event
 async def on_ready():
@@ -30,10 +36,28 @@ async def on_ready():
 
 @bot.event
 async def on_guild_available(guild):
+    global myGuild
+    myGuild = guild
     print("Create role!")
-    await guild.create_role(name="Career")
+    global careerRole
+    global zombieRole
+    global ghostRole
+    careerRole = await guild.create_role(name="Career",colour=discord.Colour.brand_green())
+    zombieRole = await guild.create_role(name="Zombie",colour=discord.Colour.dark_purple())
+    ghostRole = await guild.create_role(name="Ghost",colour=discord.Colour.dark_blue())
+    userStatus.init_role(careerRole)
+    userStatus.init_role(zombieRole)
+    userStatus.init_role(ghostRole)
     userStatus.init_users(guild)
+    await timeSchedule.time_schedule(guild)
 
+@bot.event
+async def on_member_join(member):
+    userStatus.new_user(member)
+
+@bot.event
+async def on_member_remove(member):
+    userStatus.out_user(member)
 
 @bot.event
 async def on_message(message: discord.Message):
@@ -42,14 +66,62 @@ async def on_message(message: discord.Message):
     if message.author.bot: # ボットのメッセージは無視
         return
 
+    #career汚染度
+    await userStatus.message_pollution(message)
+
+    status = userStatus.usersStatus[message.author.id][1]
+    if status == "Ghost" or status == "Ghost(static)":
+        print("delete")
+        await message.delete() 
+
     #新しいcareerコマンド
     if "!career" in message.content:
-        userStatus.init_career(message.mentions)
+        for mention in message.mentions:
+            userStatus.init_career(mention)
+            await mention.add_roles(careerRole)
+        announceChannel= message.channel
+        userStatus.init_announce(announceChannel)
 
-    #career汚染度
-    userStatus.message_pollution(message)
+    #develop commands
+    if "!pollute" in message.content:
+        await userStatus.pollute(message.author,89)
+    if "!fin" in message.content:
+        await careerRole.delete()
+        await zombieRole.delete()
+        await ghostRole.delete()
 
-    await message.reply(message.content)
+    if "!p" in message.content:
+        await message.channel.send(userStatus.printStatus(message.author))
+
+    #await message.reply(message.content)
+
+@bot.event
+async def on_reaction_add(reaction: discord.Reaction, user: discord.Member):
+    status = userStatus.usersStatus[user.id][1]
+    if status == "Ghost" or status == "Ghost(static)":
+        print("delete")
+        await reaction.clear() 
+    await userStatus.reaction_pollution(reaction.message.author, user)
+
+once = True
+@bot.event
+async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+    if after.channel != None:
+        if after.channel.id not in vcStatus.channels.keys():
+            vcStatus.new_channel(after,member)
+        elif before.channel == None:
+            await vcStatus.in_member(after,member)
+        else:
+            vcStatus.update_member(after,member)
+    else:
+        vcStatus.out_member(before,member)
+    
+    global once
+    if once:
+        once = False
+        await vcStatus.vc_time_schedule(myGuild)
 
 
 bot.run(TOKEN)
+
+
