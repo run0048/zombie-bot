@@ -14,8 +14,8 @@ def switch():
 
 async def time_schedule(guild: discord.Guild):
     global button
-    schedule.every(300).seconds.do(switch) #utc < jst 9時間
-    #schedule.every().days.at("00:00").do(switch)
+    #schedule.every(60).seconds.do(switch) #utc < jst 9時間
+    schedule.every().days.at("00:00").do(switch)
     while True:
         schedule.run_pending()
         if button == True:

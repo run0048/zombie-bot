@@ -77,23 +77,43 @@ async def on_message(message: discord.Message):
     #新しいcareerコマンド
     if "!career" in message.content:
         for mention in message.mentions:
-            userStatus.init_career(mention)
-            await mention.add_roles(careerRole)
+            if mention == message.author or message.author.guild_permissions.administrator:
+                userStatus.init_career(mention)
+                await mention.add_roles(careerRole)
         announceChannel= message.channel
         userStatus.init_announce(announceChannel)
-
-    #develop commands
-    if "!pollute" in message.content:
-        await userStatus.pollute(message.author,89)
-    if "!fin" in message.content:
-        await careerRole.delete()
-        await zombieRole.delete()
-        await ghostRole.delete()
 
     if "!p" in message.content:
         await message.channel.send(userStatus.printStatus(message.author))
 
-    #await message.reply(message.content)
+    if "!status" in message.content:
+        for id in userStatus.usersStatus.keys():
+            member = myGuild.get_member(id)
+            await message.channel.send(userStatus.printStatus(member))
+
+    #100だけ汚染させる 管理者コマンド
+    if "!pollute" in message.content:
+        if not message.author.guild_permissions.administrator:
+            return
+        await userStatus.pollute(message.author,100)
+
+    #ゾンビやゴーストを感染者を健常者に復活させる 管理者コマンド
+    if "!refresh" in message.content:
+        if not message.author.guild_permissions.administrator:
+            return
+        for mention in message.mentions:
+            userStatus.careerList.remove(mention.id)
+            for i in range(2):
+                await userStatus.purify(mention)
+
+    #作成したロールを消去させる 管理者コマンド
+    if "!fin" in message.content:
+        if not message.author.guild_permissions.administrator:
+            return
+        await careerRole.delete()
+        await zombieRole.delete()
+        await ghostRole.delete()
+
 
 @bot.event
 async def on_reaction_add(reaction: discord.Reaction, user: discord.Member):
