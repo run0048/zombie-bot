@@ -68,8 +68,8 @@ def switch():
 
 async def vc_time_schedule(guild: discord.Guild):
     global button
-    schedule.every(10).seconds.do(switch)
-    #schedule.every(1).minutes.do(switch)
+    #schedule.every(10).seconds.do(switch)
+    schedule.every(1).minutes.do(switch)
     while True:
         schedule.run_pending()
         if button == True:
